@@ -1,21 +1,31 @@
+import React, { useEffect, useState } from "react";
 import ConnectModal from "./components/ConnectModal";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { useState } from "react";
-import {auth} from './utils/firebaseConfig'
+import { auth } from "./utils/firebaseConfig";
 import CreatePost from "./components/CreatePost";
+import { getDocs, collection} from "firebase/firestore";
+import { db } from './utils/firebaseConfig';
+import Post from './components/Post'
+import { useDispatch, useSelector } from "react-redux";
+import {getPosts} from "./feature/postSlice"
 
-function App() {
+const App = () => {
+  const [user, setUser] = useState(null);
+  const dispatch = useDispatch();
+  const posts = useSelector((state)=>state.posts.posts)
 
-const [user,setUser] = useState(null);
+  onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+  });
 
+  useEffect(() =>{
+    getDocs(collection(db, 'posts')).then((res)=> 
+    dispatch(getPosts(res.docs.map((doc)=>({...doc.data(), id : doc.id})))))
+  }, [])
 
-onAuthStateChanged(auth, (currentUser)=>{
-  setUser(currentUser)
-})
-
-const handleLogout= async () => {
- await signOut(auth)
-}
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
 
   return (
     <div>
@@ -24,16 +34,25 @@ const handleLogout= async () => {
           <div className="user-infos">
             <span>{user?.displayName[0]}</span>
             <h4>{user?.displayName}</h4>
-            <button onClick={handleLogout} ><i className="fa-solid fa-arrow-right-from-bracket"></i></button>
+            <button onClick={() => handleLogout()}>
+              <i className="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
           </div>
         )}
-        {user? <CreatePost/> : <ConnectModal/> }
-       
+
+        {user ? <CreatePost uid={user.uid} displayName={user.displayName} /> : <ConnectModal />}
       </div>
       <div className="posts-container">
+        {posts&& (
+          [...posts]
+          .sort((a,b)=> b.date-a.date)
+          .map((post) => (
+            <Post post={post} key={post.id} user={user}/>
+          ))
+        )}
       </div>
     </div>
   );
-}
+};
 
 export default App;
